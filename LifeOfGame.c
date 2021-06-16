@@ -1,43 +1,30 @@
 #include <stdio.h>
 #include <time.h>
+#include <conio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <windows.h>
 
+typedef struct {
+    char cursorTag[5];
+    int  status;
+    int  x;
+    int  y;
+}Cursor;    //There are three status in a total of 'Move' 'Insert' 'Remove' by '0' '1' '2'
+
+enum key {
+    MOVE    = 77,
+    INSERT  = 73,
+    REMOVE  = 82,
+    W_UP    = 119,
+    A_LEFT  = 97,
+    S_DOWN  = 115,
+    D_RIGHT = 100,
+    Q_QUIT  = 81,
+};
+
 char Cell[9] = "⬜";
 char unCell[2] = "  ";      //one cell's place is tow rows and one cols
-
-void CreatGrid(int **grid,int cols,int rows)
-{
-    /*Random start*/
-    srand((unsigned)time(NULL));
-    for (int i = 0;i < cols;i++)
-    {
-        for (int j = 0;j < rows;j++)
-        {
-            grid[i][j] = rand() % 2;
-        }
-    }
-    /*Binker*/
-    //grid[2][2]=grid[2][3]=grid[2][4]=1;
-    /*Toad*/
-    /*         grid[6][2]=grid[6][3]=grid[6][4]=1;
-    grid[7][1]=grid[7][2]=grid[7][3]=1;*/
-    /*Glider*/
-    /*           grid[10][21]=1;
-                              grid[11][22]=1;
-    grid[12][20]=grid[12][21]=grid[12][22]=1;*/
-    /*Gosper glider gun*/
-    /*grid[ 6][26]=1;
-                                                                                                                                        grid[ 7][24]=1;     grid[ 7][26]=1;
-                                                grid[ 8][14]=grid[ 8][15]=1;                                        grid[ 8][22]=grid[ 8][23]=1;                                        grid[ 8][36]=grid[ 8][37]=1;
-                                            grid[ 9][13] = 1;                 grid[ 9][17]=1;                       grid[ 9][22]=grid[ 9][23]=1;                                        grid[ 9][36]=grid[ 9][37]=1;
-    grid[10][2]=grid[10][3]=1;      grid[10][12]=1;                               grid[10][18]=1;                   grid[10][22]=grid[10][23]=1;
-    grid[11][2]=grid[11][3]=1;      grid[11][12]=1;            grid[11][16]=1;    grid[11][18]=1;grid[11][19]=1;                        grid[11][24]=1;     grid[11][26]=1;
-                                    grid[12][12]=1;                               grid[12][18]=1;                                                           grid[12][26]=1;
-                                            grid[13][13]=1;                   grid[13][17]=1;
-                                                grid[14][14]=grid[14][15]=1;*/
-}
 
 void InitGrid(int **grid,int cols,int rows)
 {
@@ -52,6 +39,7 @@ void InitGrid(int **grid,int cols,int rows)
 
 void DispGrid(int **grid,int cols,int rows)
 {
+    printf("\033[0;0H\033[?25l\033[0m");
     for (int i = 0;i < cols;i++)
     {
         for (int j = 0;j < rows;j++)
@@ -59,6 +47,84 @@ void DispGrid(int **grid,int cols,int rows)
             printf("%s",grid[i][j] ? Cell : unCell);
         }
         printf("\n");
+    }
+}
+
+void ControlCursor(char input,Cursor *cursor,int cols,int rows)
+{
+    switch (input)
+    {
+    case MOVE:
+        cursor->status = 0;
+        break;
+    case INSERT:
+        cursor->status = 1;
+        break;
+    case REMOVE:
+        cursor->status = 2;
+        break;
+    case A_LEFT:
+        cursor->x -= 2 * (cursor->x - 2 >= 0);
+        break;
+    case D_RIGHT:
+        cursor->x += 2 * (cursor->x + 2 <= rows * 2);
+        break;
+    case W_UP:
+        cursor->y -= (cursor->y - 1 > 0);
+        break;
+    case S_DOWN:
+        cursor->y += (cursor->y + 1 <= cols);
+        break;
+    default:
+        break;
+    }
+}
+
+char *FormatCursor(char *cursorContent,Cursor cursor)
+{
+    switch (cursor.status)
+    {
+    case 0:
+        sprintf(cursorContent,"\33[%d;%dH\33[37m\33[5m%s\33[0m",cursor.y,cursor.x,cursor.cursorTag);
+        break;
+    case 1:
+        sprintf(cursorContent,"\33[%d;%dH\33[32m%s\33[0m",cursor.y,cursor.x,cursor.cursorTag);
+        break;
+    case 2:
+        sprintf(cursorContent,"\33[%d;%dH\33[31m%s\33[0m",cursor.y,cursor.x,cursor.cursorTag);
+        break;
+    default:
+        break;
+    }
+    return cursorContent;
+}
+
+void DispCursor(Cursor cursor)
+{
+    char cursorContent[30];
+    printf("%s",FormatCursor(cursorContent,cursor));
+}
+
+void Draw(int **grid,int cols,int rows)
+{
+    Cursor cursor = {
+        .cursorTag = "⬜",
+        .status = 0,
+        .x      = 1,
+        .y      = 1,
+    };
+    char input;
+    DispGrid(grid,cols,rows);
+    DispCursor(cursor);
+    while (input = getch())
+    {
+        if (input == Q_QUIT) break;
+        ControlCursor(input,&cursor,cols,rows);
+        if (cursor.status == 1) grid[cursor.y - 1][(cursor.x ) / 2] = 1;
+        if (cursor.status == 2) grid[cursor.y - 1][(cursor.x ) / 2] = 0;
+        //printf("\33[40;0HX:%d Y:%d status:%d",cursor.x,cursor.y,cursor.status);
+        DispGrid(grid,cols,rows);
+        DispCursor(cursor);
     }
 }
 
@@ -143,6 +209,30 @@ void GetWindows(int *cols,int *rows)
     *cols = csbi.srWindow.Bottom - csbi.srWindow.Top ;
 }
 
+int CheckExit()
+{
+    char input;
+    if (kbhit())
+    {
+        input = getch();
+        if (input == Q_QUIT)
+        {
+            printf("\nDo you want to exit? (Y/any) ");
+            input = getche();
+            return (input == 'Y' || input == 'y') ? 1 : 0;
+        }
+    }
+    return 0;
+}
+
+int CheckRedraw()
+{
+    char input;
+    printf("\nDo you want to redraw? (Y/any)");
+    input = getche();
+    return (input == 'Y' || input == 'y') ? 0 : 1;
+}
+
 int main()
 {
     int cols = 0;      //Columns of game map
@@ -156,15 +246,18 @@ int main()
         oldGrid[i] = (int *)malloc(rows * sizeof(int));
         newGrid[i] = (int *)malloc(rows * sizeof(int));
     }       //Make 2D array
-    InitGrid(oldGrid,cols,rows);
-    CreatGrid(oldGrid,cols,rows);
     do{
-        printf("\033[0;0H\033[?25l\033[0m");
-        DispGrid(oldGrid,cols,rows);
-        InitGrid(newGrid,cols,rows);
-        ComputeGrid(newGrid,cols,rows,oldGrid);
-        printf("\033[?25hGeneration: %3d Cell: %3d\033[0m",generation,CountCells(oldGrid,cols,rows));
-        generation++;
-    } while (1);
+        InitGrid(oldGrid,cols,rows);
+        Draw(oldGrid,cols,rows);
+        do{
+            DispGrid(oldGrid,cols,rows);
+            InitGrid(newGrid,cols,rows);
+            ComputeGrid(newGrid,cols,rows,oldGrid);
+            printf("\033[?25hGeneration: %-6d Cell: %-6d\033[0m",generation,CountCells(oldGrid,cols,rows));
+            generation++;
+            if (CheckExit()) break;
+        } while (1);
+        if (CheckRedraw()) break;
+    }while (1);
     FreeGrid(oldGrid,newGrid,cols,rows);
 }
