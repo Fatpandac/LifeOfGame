@@ -1,9 +1,9 @@
 #include <stdio.h>
-#include <time.h>
 #include <conio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <windows.h>
+
+// #define DEBUG
 
 typedef struct {
     char cursorTag[5];
@@ -50,6 +50,34 @@ void DispGrid(int **grid,int cols,int rows)
     }
 }
 
+void ClearFootPrint(int **grid,int x,int y,int cols,int rows)
+{
+#ifdef DEBUG
+    system("cls");
+    if (!grid[y - 1][((x - 1)/2 - 1 + rows) % rows]) printf("\33[%d;%dH\33[37m%s\33[0m",y,((x - 2 + rows*2) % (rows*2)),Cell);
+    if (!grid[((y - 1) - 1 + cols) % cols][((x - 1)/2 + rows) % rows]) printf("\33[%d;%dH\33[37m%s\33[0m",y - 1,x,Cell);
+    if (!grid[y - 1][((x - 1)/2 + 1 + rows) % rows]) printf("\33[%d;%dH\33[37m%s\33[0m",y,((x + 2 + rows*2) % (rows*2)),Cell);
+    if (!grid[((y - 1) + 1 + cols) % cols][((x - 1)/2 + rows) % rows]) printf("\33[%d;%dH\33[37m%s\33[0m",y + 1,x,Cell);
+#else
+    if (!grid[y - 1][((x - 1)/2 - 1 + rows) % rows]) printf("\33[%d;%dH\33[37m%s\33[0m",y,((x - 2 + rows*2) % (rows*2)),unCell);
+    if (!grid[((y - 1) - 1 + cols) % cols][((x - 1)/2 + rows) % rows]) printf("\33[%d;%dH\33[37m%s\33[0m",y - 1,x,unCell);
+    if (!grid[y - 1][((x - 1)/2 + 1 + rows) % rows]) printf("\33[%d;%dH\33[37m%s\33[0m",y,((x + 2 + rows*2) % (rows*2)),unCell);
+    if (!grid[((y - 1) + 1 + cols) % cols][((x - 1)/2 + rows) % rows]) printf("\33[%d;%dH\33[37m%s\33[0m",y + 1,x,unCell);
+#endif
+}
+
+void DrawDispGrid(int **grid,int cols,int rows)
+{
+    printf("\033[?25l\033[0m");
+    for (int i = 0;i < cols;i++)
+    {
+        for (int j = 0;j < rows;j++)
+        {
+            if (grid[i][j]) printf("\33[%d;%dH\33[37m%s\33[0m",i+1,j*2+1,Cell);
+        }
+    }
+}
+
 void ControlCursor(char input,Cursor *cursor,int cols,int rows)
 {
     switch (input)
@@ -64,7 +92,7 @@ void ControlCursor(char input,Cursor *cursor,int cols,int rows)
         cursor->status = 2;
         break;
     case A_LEFT:
-        cursor->x -= 2 * (cursor->x - 2 >= 0);
+        cursor->x -= 2 * (cursor->x - 2 > 0);
         break;
     case D_RIGHT:
         cursor->x += 2 * (cursor->x + 2 <= rows * 2);
@@ -120,10 +148,13 @@ void Draw(int **grid,int cols,int rows)
     {
         if (input == Q_QUIT) break;
         ControlCursor(input,&cursor,cols,rows);
-        if (cursor.status == 1) grid[cursor.y - 1][(cursor.x ) / 2] = 1;
-        if (cursor.status == 2) grid[cursor.y - 1][(cursor.x ) / 2] = 0;
-        //printf("\33[40;0HX:%d Y:%d status:%d",cursor.x,cursor.y,cursor.status);
-        DispGrid(grid,cols,rows);
+        if (cursor.status == 1) grid[cursor.y - 1][(cursor.x) / 2] = 1;
+        if (cursor.status == 2) grid[cursor.y - 1][(cursor.x) / 2] = 0;
+#ifdef DEBUG
+        printf("\33[40;0HX:%d Y:%d status:%d",cursor.x,cursor.y,cursor.status);
+#endif
+        ClearFootPrint(grid,cursor.x,cursor.y,cols,rows);
+        DrawDispGrid(grid,cols,rows);
         DispCursor(cursor);
     }
 }
@@ -206,7 +237,7 @@ void GetWindows(int *cols,int *rows)
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
     *rows = (csbi.srWindow.Right - csbi.srWindow.Left + 1)/2;
-    *cols = csbi.srWindow.Bottom - csbi.srWindow.Top ;
+    *cols = csbi.srWindow.Bottom - csbi.srWindow.Top;
 }
 
 int CheckExit()
@@ -246,6 +277,10 @@ int main()
         oldGrid[i] = (int *)malloc(rows * sizeof(int));
         newGrid[i] = (int *)malloc(rows * sizeof(int));
     }       //Make 2D array
+#ifdef DEBUG
+    printf("%d %d",cols,rows);
+    getch();
+#endif
     do{
         InitGrid(oldGrid,cols,rows);
         Draw(oldGrid,cols,rows);
